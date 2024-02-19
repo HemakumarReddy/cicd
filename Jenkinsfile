@@ -4,13 +4,18 @@ pipeline {
     
     environment {
         IMAGE_TAG = "${BUILD_NUMBER}"
+        registryCredential = 'ecr:us-east-1:awscreds'
+        appRegistry = '211125716680.dkr.ecr.us-east-1.amazonaws.com/hh-java'
+        awsRegistry = "https://211125716680.dkr.ecr.us-east-1.amazonaws.com"
+        cluster = "Stagging-Environment"
+        service = "java-app"
     }
     
     stages {
         
         stage('Checkout'){
            steps {
-                git credentialsId: '7d24c14b-b9a0-46ca-aafc-e81c6635f61e', 
+                git credentialsId: 'debb8179-e4c3-4352-9fc7-48537c407669', 
                 url: 'https://github.com/HemakumarReddy/cicd',
                 branch: 'main'
            }
@@ -21,7 +26,7 @@ pipeline {
                 script{
                     sh '''
                     echo 'Buid Docker Image'
-                    docker build -t abhishekf5/cicd-e2e:${BUILD_NUMBER} .
+                    docker build -t hemakumarux/cicd-e2e:${BUILD_NUMBER} .
                     '''
                 }
             }
@@ -30,13 +35,21 @@ pipeline {
         stage('Push the artifacts'){
            steps{
                 script{
-                    sh '''
-                    echo 'Push to Repo'
-                    docker push abhishekf5/cicd-e2e:${BUILD_NUMBER}
-                    '''
+                    docker.withRegistry( awsRegistry, registryCredential ){
+                        sh '''
+                        echo 'Push to Repo'
+                        docker push hemakumarux/cicd-e2e:${BUILD_NUMBER}
+                        '''
+                     }
                 }
             }
         }     
-        
+        stage('deploy to ecs'){            
+            steps{               
+                withAWS(credentials: 'awscreds', region: 'us-east-1') {
+                    sh 'aws ecs update-service --cluster ${cluster} --service ${service} --force-new-deployment'
+                }
+                }
+        }        
     }
 }
